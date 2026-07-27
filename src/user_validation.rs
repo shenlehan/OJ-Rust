@@ -1,27 +1,18 @@
-use crate::configs::*;
 use crate::types::*;
-use crate::utilities::*;
 
 use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 
 #[post("/jobs")]
-async fn post_jobs(body: web::Json<PostJob>) -> impl Responder {
-    let mut has_error = false;
+pub async fn post_jobs(body: web::Json<PostJob>, config: web::Data<OJConfig>) -> impl Responder {
     let mut code = 0;
-    let mut reason: &str;
-    let mut message: &str;
-    if !elem_in_arr(&body.language.make_ascii_lowercase(), LANGUAGES)
-        || !elem_in_arr(&body.problem_id, PROBLEMS)
-        || !elem_in_arr(&body.user_id, USERS)
-        || !elem_in_arr(&body.contest_id, CONTESTS)
-    {
-        has_error = true;
-        code = 1;
-        reason = "ERR_INVALID_ARGUMENT";
-        message = "HTTP 400 Bad Request";
-    }
 
-    if has_error {
+    let language = config.languages.iter().find(|lang| lang.name == body.language);
+    let problem = config.problems.iter().find(|problem| problem.id == body.problem_id);
+
+    if language.is_none() || problem.is_none() || body.user_id != 0 || body.contest_id != 0 {
+        code = 1;
+        let reason = "ERR_INVALID_ARGUMENT";
+        let message = "HTTP 400 Bad Request";
         return HttpResponse::BadRequest().json(Error {
             code: code,
             reason: String::from(reason),
@@ -29,21 +20,23 @@ async fn post_jobs(body: web::Json<PostJob>) -> impl Responder {
         });
     }
 
+    let language = language.unwrap();
+    let problem = problem.unwrap();
 
-    
+    HttpResponse::Ok().json(TestJob::default())
 }
 
-#[get("/jobs")]
-async fn get_jobs(name: web::Path<String>) -> impl Responder {}
-
-#[post("/jobs/jobId")]
-async fn post_job_id(name: web::Path<String>) -> impl Responder {}
-
-#[get("/jobs/jobId")]
-async fn get_job_id(name: web::Path<String>) -> impl Responder {}
-
-#[put("/jobs/jobId")]
-async fn put_job_id(name: web::Path<String>) -> impl Responder {}
-
-#[delete("/jobs/jobId")]
-async fn delete_job_id(name: web::Path<String>) -> impl Responder {}
+// #[get("/jobs")]
+// async fn get_jobs(name: web::Path<String>) -> impl Responder {}
+//
+// #[post("/jobs/jobId")]
+// async fn post_job_id(name: web::Path<String>) -> impl Responder {}
+//
+// #[get("/jobs/jobId")]
+// async fn get_job_id(name: web::Path<String>) -> impl Responder {}
+//
+// #[put("/jobs/jobId")]
+// async fn put_job_id(name: web::Path<String>) -> impl Responder {}
+//
+// #[delete("/jobs/jobId")]
+// async fn delete_job_id(name: web::Path<String>) -> impl Responder {}

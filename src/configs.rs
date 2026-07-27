@@ -1,22 +1,4 @@
-use crate::types;
-use crate::types::OJConfig;
-
-pub static config: OJConfig = OJConfig::Default();
-
-pub static LANGUAGES: &Vec<&str> = &vec![
-    "rust", "c", "c++"
-];
-
-pub static PROBLEMS: &Vec<i32> = &vec![0];
-pub static USERS: &Vec<i32> = &vec![0];
-pub static CONTESTS: &Vec<i32> = &vec![0];
-
-
-pub static JOB_ID: i32 = 0;
-pub static USER_ID: i32 = 0;
-pub static CONTEST_ID: i32 = 0;
-
-pub fn read_config_file(config_file: &mut String) -> Result<(), Box<dyn std::error::Error>> {
+pub fn read_config_file(config_file: &mut String) -> std::io::Result<()> {
     let mut has_config_file = 0;
     let mut meet_config_file = 0;
 
@@ -35,7 +17,10 @@ pub fn read_config_file(config_file: &mut String) -> Result<(), Box<dyn std::err
     }
 
     if has_config_file == 0 || meet_config_file == 1 {
-        return Err(Box::from("Error! Missing config file!"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "missing config file",
+        ));
     }
 
     Ok(())

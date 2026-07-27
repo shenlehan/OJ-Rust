@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use oj::types::*;
 use serde_json::from_str;
+use oj::user_validation::*;
 
 #[get("/hello/{name}")]
 async fn greet(name: web::Path<String>) -> impl Responder {
@@ -30,15 +31,21 @@ async fn main() -> std::io::Result<()> {
 
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
 
-    HttpServer::new(|| {
+    let bind_address = config.server.bind_address.clone();
+    let bind_port = config.server.bind_port;
+    let config_data = web::Data::new(config);
+
+    HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
+            .app_data(config_data.clone())
+            .service(post_jobs)
             .route("/hello", web::get().to(|| async { "Hello World!" }))
             .service(greet)
             // DO NOT REMOVE: used in automatic testing
             .service(exit)
     })
-    .bind(("127.0.0.1", 12345))?
+    .bind((bind_address.as_str(), bind_port))?
     .run()
     .await
 }

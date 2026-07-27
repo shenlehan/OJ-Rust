@@ -8,9 +8,8 @@ pub struct Error {
     pub message: String
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct PostJob {
-    pub id: i32,
     pub source_code: String,
     pub language: String,
     pub user_id: i32,
@@ -84,4 +83,28 @@ pub struct Language {
     pub name: String,
     pub file_name: String,
     pub command: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct TestJob {
+    pub id: i32,
+    pub created_time: String,
+    pub updated_time: String,
+    pub submission: PostJob,
+    pub state: String,
+    pub result: String,
+    pub score: f64,
+    pub cases: Vec<TestJobCase>
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct TestJobCase {
+    pub id: i32,
+    pub result: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub info: Option<String>,
 }
