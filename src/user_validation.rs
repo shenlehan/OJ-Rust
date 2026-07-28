@@ -24,10 +24,9 @@ pub async fn post_jobs(body: web::Json<PostJob>, config: web::Data<OJConfig>) ->
 
     let language = language.unwrap();
     let problem = problem.unwrap();
-
     let mut submission = body.into_inner();
 
-    let res = match run("0", problem, &submission.source_code) {
+    let res = match run("0", problem, &submission.source_code, &language) {
         Ok(res) => res,
         Err(_) => {
             return HttpResponse::InternalServerError().json(

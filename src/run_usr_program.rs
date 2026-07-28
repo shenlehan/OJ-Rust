@@ -10,7 +10,12 @@ use crate::types::*;
 use std::path::PathBuf;
 use crate::utilities::*;
 
-pub fn run(usr_name: &str, problem: &Problem, source_code: &str) -> std::io::Result<JudgeResult> {
+pub fn run(
+    usr_name: &str,
+    problem: &Problem,
+    source_code: &str,
+    language: &Language
+) -> std::io::Result<JudgeResult> {
     let timestamp = Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string();
     let work_dir = PathBuf::from("/tmp/rust_oj")
         .join(usr_name)
@@ -34,19 +39,28 @@ pub fn run(usr_name: &str, problem: &Problem, source_code: &str) -> std::io::Res
 
     /* Save the user program*/
     fs::create_dir_all(&work_dir)?;
-    let source_path = work_dir.join("code.rs");
+    let source_path = work_dir.join(&language.file_name);
     let exec_path = work_dir.join("a");
     let mut source_file = File::create(&source_path)?;
     source_file.write_all(&source_code.as_bytes())?;
 
     /* Compile */
-    let status = Command::new("rustc")
-        .arg("-o")
-        .arg(&exec_path)
-        .arg(&source_path)
-        .status()?;
+    let mut compile_cmd = Command::new(&language.command[0]);
+    for arg in language.command.iter().skip(1) {
+        match arg.as_str() {
+          "%INPUT%" => {
+              compile_cmd.arg(&source_path);
+          }
+          "%OUTPUT%" => {
+              compile_cmd.arg(&exec_path);
+          }
+          _ => {
+              compile_cmd.arg(arg);
+          }
+        }
+    }
 
-    if !status.success() {
+    if !compile_cmd.status()?.success() {
         judge_res.result = "Compilation Error".to_string();
         judge_res.score = 0.0;
         judge_res.cases.push(
@@ -161,7 +175,7 @@ pub fn run(usr_name: &str, problem: &Problem, source_code: &str) -> std::io::Res
         )
     }
 
-    println!("process finished with: {status}");
+    // println!("process finished with: {status}");
 
     judge_res.result = final_result;
     Ok(judge_res)
