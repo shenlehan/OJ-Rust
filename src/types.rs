@@ -71,10 +71,10 @@ pub struct Problem {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestCase {
-    pub score: f32,
+    pub score: f64,
     pub input_file: String,
     pub answer_file: String,
-    pub time_limit: i32,
+    pub time_limit: u128,
     pub memory_limit: i32
 }
 
@@ -102,9 +102,16 @@ pub struct TestJobCase {
     pub id: i32,
     pub result: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time: Option<u64>,
+    pub time: Option<u128>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub info: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct JudgeResult {
+    pub score: f64,
+    pub result: String,
+    pub cases: Vec<TestJobCase>
 }

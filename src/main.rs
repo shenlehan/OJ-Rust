@@ -26,7 +26,7 @@ async fn exit() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     let mut config_file_path = String::from("");
     read_config_file(&mut config_file_path)?;
-    let mut config_json = std::fs::read_to_string(config_file_path)?;
+    let config_json = std::fs::read_to_string(config_file_path)?;
     let config: OJConfig = from_str(&config_json)?;
 
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));

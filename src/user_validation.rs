@@ -1,6 +1,8 @@
 use crate::types::*;
-
 use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
+use chrono::Utc;
+use crate::run_usr_program::*;
+
 
 #[post("/jobs")]
 pub async fn post_jobs(body: web::Json<PostJob>, config: web::Data<OJConfig>) -> impl Responder {
@@ -23,7 +25,34 @@ pub async fn post_jobs(body: web::Json<PostJob>, config: web::Data<OJConfig>) ->
     let language = language.unwrap();
     let problem = problem.unwrap();
 
-    HttpResponse::Ok().json(TestJob::default())
+    let mut submission = body.into_inner();
+
+    let res = match run("0", problem, &submission.source_code) {
+        Ok(res) => res,
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(
+                Error {
+                    code: code,
+                    reason: String::from(""),
+                    message: String::from(""),
+                }
+            );
+        }
+    };
+
+    HttpResponse::Ok().json(
+        TestJob {
+            id: 0,
+            created_time: Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+            updated_time: Utc::now().format("%Y-%m-%dT%H:%M:%S%.3fZ").to_string(),
+            submission: submission,
+            state: "Finished".to_string(),
+            result: res.result,
+            score: res.score,
+            cases: res.cases
+        }
+    )
+    // run()
 }
 
 // #[get("/jobs")]
