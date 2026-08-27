@@ -42,7 +42,7 @@ pub struct GetJob {
     pub cases: Vec<TestCase>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct User {
     pub id: i32,
     pub name: String,
@@ -52,6 +52,19 @@ pub struct User {
 pub struct PostUser {
     pub id: Option<i32>,
     pub name: String,
+}
+
+#[derive(Debug, Deserialize, Default)]
+pub struct RanklistQuery {
+    pub scoring_rule: Option<String>,
+    pub tie_breaker: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct RanklistEntry {
+    pub user: User,
+    pub rank: i32,
+    pub scores: Vec<f64>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

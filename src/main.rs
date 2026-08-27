@@ -53,6 +53,7 @@ async fn main() -> std::io::Result<()> {
             .service(put_job_id)
             .service(get_users)
             .service(post_users)
+            .service(get_ranklist)
             .route("/hello", web::get().to(|| async { "Hello World!" }))
             .service(greet)
             // DO NOT REMOVE: used in automatic testing

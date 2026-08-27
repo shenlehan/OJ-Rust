@@ -2,6 +2,7 @@ use crate::types::*;
 use actix_web::{HttpResponse, Responder, delete, get, post, put, web};
 use chrono::Utc;
 use crate::run_usr_program::*;
+use std::cmp::Ordering;
 use std::sync::Mutex;
 
 #[post("/jobs")]
@@ -258,6 +259,186 @@ pub async fn post_users(
             HttpResponse::Ok().json(users.last().unwrap())
         }
     }
+}
+
+struct RanklistRow {
+    user: User,
+    rank: i32,
+    scores: Vec<f64>,
+    total_score: f64,
+    submission_count: usize,
+    submission_time: Option<String>,
+}
+
+fn compare_submission_time(a: &Option<String>, b: &Option<String>) -> Ordering {
+    match (a, b) {
+        (Some(a), Some(b)) => a.cmp(b),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => Ordering::Equal,
+    }
+}
+
+fn same_rank(a: &RanklistRow, b: &RanklistRow, tie_breaker: Option<&str>) -> bool {
+    if a.total_score != b.total_score {
+        return false;
+    }
+
+    match tie_breaker {
+        Some("user_id") => a.user.id == b.user.id,
+        Some("submission_count") => a.submission_count == b.submission_count,
+        Some("submission_time") => a.submission_time == b.submission_time,
+        _ => true,
+    }
+}
+
+#[get("/contests/{contest_id}/ranklist")]
+pub async fn get_ranklist(
+    contest_id: web::Path<i32>,
+    query: web::Query<RanklistQuery>,
+    config: web::Data<OJConfig>,
+    jobs: web::Data<Mutex<Vec<TestJob>>>,
+    users: web::Data<Mutex<Vec<User>>>,
+) -> impl Responder {
+    let contest_id = contest_id.into_inner();
+    if contest_id != 0 {
+        return HttpResponse::NotFound().json(Error {
+            code: 3,
+            reason: "ERR_NOT_FOUND".to_string(),
+            message: format!("Contest {} not found.", contest_id),
+        });
+    }
+
+    let scoring_rule = query.scoring_rule.as_deref().unwrap_or("latest");
+    if !matches!(scoring_rule, "latest" | "highest") {
+        return HttpResponse::BadRequest().json(Error {
+            code: 1,
+            reason: "ERR_INVALID_ARGUMENT".to_string(),
+            message: "Invalid argument scoring_rule".to_string(),
+        });
+    }
+
+    let tie_breaker = query.tie_breaker.as_deref();
+    if !matches!(
+        tie_breaker,
+        None | Some("user_id" | "submission_count" | "submission_time")
+    ) {
+        return HttpResponse::BadRequest().json(Error {
+            code: 1,
+            reason: "ERR_INVALID_ARGUMENT".to_string(),
+            message: "Invalid argument tie_breaker".to_string(),
+        });
+    }
+
+    let mut problem_ids: Vec<i32> = config.problems.iter().map(|problem| problem.id).collect();
+    problem_ids.sort_unstable();
+
+    let users = users.lock().unwrap().clone();
+    let jobs = jobs.lock().unwrap();
+    let mut rows: Vec<RanklistRow> = users
+        .into_iter()
+        .map(|user| {
+            let user_jobs: Vec<&TestJob> = jobs
+                .iter()
+                .filter(|job| {
+                    job.submission.user_id == user.id
+                        && job.submission.contest_id == contest_id
+                })
+                .collect();
+            let submission_count = user_jobs.len();
+            let mut submission_time: Option<String> = None;
+            let mut scores = Vec::with_capacity(problem_ids.len());
+
+            for problem_id in &problem_ids {
+                let problem_jobs: Vec<&TestJob> = user_jobs
+                    .iter()
+                    .copied()
+                    .filter(|job| job.submission.problem_id == *problem_id)
+                    .collect();
+
+                let selected = if scoring_rule == "highest" {
+                    problem_jobs.into_iter().max_by(|a, b| {
+                        a.score
+                            .partial_cmp(&b.score)
+                            .unwrap_or(Ordering::Equal)
+                            .then_with(|| b.created_time.cmp(&a.created_time))
+                    })
+                } else {
+                    problem_jobs
+                        .into_iter()
+                        .max_by(|a, b| a.created_time.cmp(&b.created_time))
+                };
+
+                if let Some(job) = selected {
+                    scores.push(job.score);
+                    if submission_time
+                        .as_ref()
+                        .map_or(true, |time| job.created_time.as_str() > time.as_str())
+                    {
+                        submission_time = Some(job.created_time.clone());
+                    }
+                } else {
+                    scores.push(0.0);
+                }
+            }
+
+            let total_score = scores.iter().sum();
+            RanklistRow {
+                user,
+                rank: 0,
+                scores,
+                total_score,
+                submission_count,
+                submission_time,
+            }
+        })
+        .collect();
+
+    rows.sort_by(|a, b| {
+        let score_order = b
+            .total_score
+            .partial_cmp(&a.total_score)
+            .unwrap_or(Ordering::Equal);
+        if score_order != Ordering::Equal {
+            return score_order;
+        }
+
+        let tie_order = match tie_breaker {
+            Some("user_id") => a.user.id.cmp(&b.user.id),
+            Some("submission_count") => a.submission_count.cmp(&b.submission_count),
+            Some("submission_time") => {
+                compare_submission_time(&a.submission_time, &b.submission_time)
+            }
+            _ => Ordering::Equal,
+        };
+        if tie_order != Ordering::Equal {
+            return tie_order;
+        }
+
+        a.user.id.cmp(&b.user.id)
+    });
+
+    for index in 0..rows.len() {
+        let rank = if index == 0 {
+            1
+        } else if same_rank(&rows[index - 1], &rows[index], tie_breaker) {
+            rows[index - 1].rank
+        } else {
+            (index + 1) as i32
+        };
+        rows[index].rank = rank;
+    }
+
+    let ranklist: Vec<RanklistEntry> = rows
+        .into_iter()
+        .map(|row| RanklistEntry {
+            user: row.user,
+            rank: row.rank,
+            scores: row.scores,
+        })
+        .collect();
+
+    HttpResponse::Ok().json(ranklist)
 }
 
 // #[post("/jobs/jobId")]
