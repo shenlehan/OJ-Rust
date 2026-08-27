@@ -127,8 +127,69 @@ pub async fn get_job_id(
     }
 }
 
-// #[put("/jobs/jobId")]
-// async fn put_job_id(name: web::Path<String>) -> impl Responder {}
+#[put("/jobs/{job_id}")]
+pub async fn put_job_id(
+    job_id: web::Path<i32>,
+    jobs: web::Data<Mutex<Vec<TestJob>>>,
+    config: web::Data<OJConfig>
+) -> impl Responder {
+
+    let job_id = job_id.into_inner();
+
+    let submission = {
+        let jobs = jobs.lock().unwrap();
+        let job = match jobs.iter().find(|job| { job.id == job_id }) {
+            Some(job) => job,
+            None => {
+                return HttpResponse::NotFound().json(Error {
+                    code: 3,
+                    reason: "ERR_NOT_FOUND".to_string(),
+                    message: format!("Job {} not found.", job_id),
+                })
+            }
+        };
+
+        if job.state != "Finished" {
+            return HttpResponse::BadRequest().json(Error {
+                code: 2,
+                reason: "ERR_INVALID_STATE".to_string(),
+                message: format!("Job {} not finished.", job_id),
+            });
+        }
+
+        job.submission.clone()
+    };
+
+    let language = config.languages.iter()
+        .find(|language| language.name == submission.language)
+        .unwrap();
+
+    let problem = config.problems.iter()
+        .find(|problem| problem.id == submission.problem_id)
+        .unwrap();
+
+    let res = match run("0", problem, &submission.source_code, language) {
+        Ok(res) => res,
+        Err(_) => {
+            return HttpResponse::InternalServerError().json(Error {
+                code: 0,
+                reason: "".to_string(),
+                message: "".to_string(),
+            });
+        }
+    };
+
+    let mut jobs = jobs.lock().unwrap();
+    let job = jobs.iter_mut().find(|job| { job.id == job_id }).unwrap();
+    job.updated_time = Utc::now()
+        .format("%Y-%m-%dT%H:%M:%S%.3fZ")
+        .to_string();
+    job.state = "Finished".to_string();
+    job.result = res.result;
+    job.score = res.score;
+    job.cases = res.cases;
+    HttpResponse::Ok().json(job)
+}
 
 // #[post("/jobs/jobId")]
 // async fn post_job_id(name: web::Path<String>) -> impl Responder {}

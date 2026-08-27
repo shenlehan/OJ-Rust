@@ -8,7 +8,7 @@ pub struct Error {
     pub message: String
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct PostJob {
     pub source_code: String,
     pub language: String,
