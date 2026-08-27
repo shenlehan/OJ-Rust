@@ -36,16 +36,23 @@ async fn main() -> std::io::Result<()> {
     let bind_port = config.server.bind_port;
     let config_data = web::Data::new(config);
     let jobs_data = web::Data::new(Mutex::new(Vec::<TestJob>::new()));
+    let users_data = web::Data::new(Mutex::new(vec![User {
+        id: 0,
+        name: "root".to_string(),
+    }]));
 
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
             .app_data(config_data.clone())
             .app_data(jobs_data.clone())
+            .app_data(users_data.clone())
             .service(post_jobs)
             .service(get_jobs)
             .service(get_job_id)
             .service(put_job_id)
+            .service(get_users)
+            .service(post_users)
             .route("/hello", web::get().to(|| async { "Hello World!" }))
             .service(greet)
             // DO NOT REMOVE: used in automatic testing

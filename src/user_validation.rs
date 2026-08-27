@@ -6,13 +6,28 @@ use std::sync::Mutex;
 
 #[post("/jobs")]
 pub async fn post_jobs(body: web::Json<PostJob>, config: web::Data<OJConfig>,
-                       jobs: web::Data<Mutex<Vec<TestJob>>>) -> impl Responder {
+                       jobs: web::Data<Mutex<Vec<TestJob>>>,
+                       users: web::Data<Mutex<Vec<User>>>) -> impl Responder {
     let mut code = 0;
+
+    let user_exists = users
+        .lock()
+        .unwrap()
+        .iter()
+        .any(|user| user.id == body.user_id);
+
+    if !user_exists {
+        return HttpResponse::NotFound().json(Error {
+            code: 3,
+            reason: "ERR_NOT_FOUND".to_string(),
+            message: format!("User {} not found.", body.user_id),
+        });
+    }
 
     let language = config.languages.iter().find(|lang| lang.name == body.language);
     let problem = config.problems.iter().find(|problem| problem.id == body.problem_id);
 
-    if language.is_none() || problem.is_none() || body.user_id != 0 || body.contest_id != 0 {
+    if language.is_none() || problem.is_none() || body.contest_id != 0 {
         code = 1;
         let reason = "ERR_INVALID_ARGUMENT";
         let message = "HTTP 400 Bad Request";
@@ -56,7 +71,6 @@ pub async fn post_jobs(body: web::Json<PostJob>, config: web::Data<OJConfig>,
 
     jobs.push(job);
     HttpResponse::Ok().json(jobs.last().unwrap())
-    // run()
 }
 
 #[get("/jobs")]
@@ -189,6 +203,61 @@ pub async fn put_job_id(
     job.score = res.score;
     job.cases = res.cases;
     HttpResponse::Ok().json(job)
+}
+
+#[get("/users")]
+pub async fn get_users(
+    users: web::Data<Mutex<Vec<User>>>
+) -> impl Responder {
+    let users = users.lock().unwrap();
+    HttpResponse::Ok().json(&*users)
+}
+
+#[post("/users")]
+pub async fn post_users(
+    body: web::Json<PostUser>,
+    users: web::Data<Mutex<Vec<User>>>
+) -> impl Responder {
+    let body = body.into_inner();
+    let mut users = users.lock().unwrap();
+
+    let duplicate = users
+        .iter()
+        .any(|user| user.name == body.name && Some(user.id) != body.id);
+
+    if duplicate {
+        return HttpResponse::BadRequest().json(Error {
+            code: 1,
+            reason: "ERR_INVALID_ARGUMENT".to_string(),
+            message: format!("User name '{}' already exists.", body.name),
+        });
+    }
+
+    match body.id {
+        Some(id) => {
+            let user = match users.iter_mut().find(|user| user.id == id) {
+                Some(user) => user,
+                None => {
+                    return HttpResponse::NotFound().json(Error {
+                        code: 3,
+                        reason: "ERR_NOT_FOUND".to_string(),
+                        message: format!("User {} not found.", id),
+                    });
+                }
+            };
+
+            user.name = body.name;
+            HttpResponse::Ok().json(user)
+        }
+        None => {
+            let id = users.len() as i32;
+            users.push(User {
+                id,
+                name: body.name,
+            });
+            HttpResponse::Ok().json(users.last().unwrap())
+        }
+    }
 }
 
 // #[post("/jobs/jobId")]

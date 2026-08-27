@@ -49,6 +49,12 @@ pub struct User {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct PostUser {
+    pub id: Option<i32>,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Contest {
     pub id: i32,
     pub name: String,
