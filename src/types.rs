@@ -17,6 +17,19 @@ pub struct PostJob {
     pub problem_id: i32,
 }
 
+#[derive(Debug, Deserialize, Default)]
+pub struct JobFilter {
+    pub user_id: Option<i32>,
+    pub user_name: Option<String>,
+    pub contest_id: Option<i32>,
+    pub problem_id: Option<i32>,
+    pub language: Option<String>,
+    pub from: Option<String>,
+    pub to: Option<String>,
+    pub state: Option<String>,
+    pub result: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GetJob {
     pub id: i32,

@@ -6,6 +6,7 @@ use std::io::Read;
 use oj::types::*;
 use serde_json::from_str;
 use oj::user_validation::*;
+use std::sync::Mutex;
 
 #[get("/hello/{name}")]
 async fn greet(name: web::Path<String>) -> impl Responder {
@@ -34,12 +35,15 @@ async fn main() -> std::io::Result<()> {
     let bind_address = config.server.bind_address.clone();
     let bind_port = config.server.bind_port;
     let config_data = web::Data::new(config);
+    let jobs_data = web::Data::new(Mutex::new(Vec::<TestJob>::new()));
 
     HttpServer::new(move || {
         App::new()
             .wrap(Logger::default())
             .app_data(config_data.clone())
+            .app_data(jobs_data.clone())
             .service(post_jobs)
+            .service(get_jobs)
             .route("/hello", web::get().to(|| async { "Hello World!" }))
             .service(greet)
             // DO NOT REMOVE: used in automatic testing
