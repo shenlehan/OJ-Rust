@@ -104,9 +104,29 @@ pub async fn get_jobs(
     HttpResponse::Ok().json(filtered_jobs)
 }
 
-// #[get("/jobs/jobId")]
-// async fn get_job_id(name: web::Path<String>) -> impl Responder {}
-//
+#[get("/jobs/{job_id}")]
+pub async fn get_job_id(
+    job_id: web::Path<i32>,
+    jobs: web::Data<Mutex<Vec<TestJob>>>
+) -> impl Responder {
+    let jobs = jobs.lock().unwrap();
+    let job_id = job_id.into_inner();
+    let result = jobs.iter().find(|job|
+        {
+            job.id == job_id
+        }
+    );
+
+    match result {
+        Some(job) => HttpResponse::Ok().json(job),
+        None => HttpResponse::NotFound().json(Error {
+            code: 3,
+            reason: "ERR_NOT_FOUND".to_string(),
+            message: format!("Job {} not found.", job_id),
+        }),
+    }
+}
+
 // #[put("/jobs/jobId")]
 // async fn put_job_id(name: web::Path<String>) -> impl Responder {}
 

@@ -44,6 +44,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(jobs_data.clone())
             .service(post_jobs)
             .service(get_jobs)
+            .service(get_job_id)
             .route("/hello", web::get().to(|| async { "Hello World!" }))
             .service(greet)
             // DO NOT REMOVE: used in automatic testing
